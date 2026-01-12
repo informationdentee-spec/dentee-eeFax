@@ -1,58 +1,43 @@
 ---
 name: 不動産業界向けインターネットFAX仕様書作成
-overview: 不動産業界に特化したインターネットFAXアプリケーションの包括的な仕様書を作成します。Next.jsベースで、スマホ・PC対応のレスポンシブデザインを想定します。
+overview: 不動産業界に特化したインターネットFAXアプリケーションの軽量化された仕様書。Next.js + Firebaseベースで、迅速かつ安定した動作を実現。
 todos:
   - id: setup-project
     content: Next.jsプロジェクトのセットアップ（TypeScript、Tailwind CSS、shadcn/ui）
     status: pending
-  - id: setup-database
-    content: データベーススキーマ設計とマイグレーション設定（PostgreSQL）
+  - id: setup-firebase
+    content: Firebaseプロジェクト初期化（Authentication、Firestore、Storage）
     status: pending
   - id: implement-auth
-    content: 認証機能の実装（NextAuth.js）
+    content: Firebase Authentication実装（ログイン、登録）
     status: pending
     dependencies:
       - setup-project
+      - setup-firebase
   - id: implement-fax-send
     content: FAX送信機能の実装（外部FAX API連携）
     status: pending
     dependencies:
-      - setup-database
+      - setup-firebase
       - implement-auth
   - id: implement-fax-receive
-    content: FAX受信機能の実装（Webhook受信、ファイル保存）
+    content: FAX受信機能の実装（Webhook受信、Cloud Storage保存）
     status: pending
     dependencies:
-      - setup-database
+      - setup-firebase
       - implement-auth
   - id: implement-history
-    content: 送受信履歴管理機能の実装
+    content: 送受信履歴管理機能の実装（Firestore）
     status: pending
     dependencies:
       - implement-fax-send
       - implement-fax-receive
   - id: implement-addressbook
-    content: アドレス帳管理機能の実装
+    content: アドレス帳管理機能の実装（Firestore）
     status: pending
     dependencies:
-      - setup-database
+      - setup-firebase
       - implement-auth
-  - id: implement-templates
-    content: テンプレート機能の実装
-    status: pending
-    dependencies:
-      - setup-database
-      - implement-auth
-  - id: implement-property-integration
-    content: 物件情報連携機能の実装
-    status: pending
-    dependencies:
-      - setup-database
-  - id: implement-client-integration
-    content: 顧客管理連携機能の実装
-    status: pending
-    dependencies:
-      - setup-database
   - id: implement-ui
     content: レスポンシブUIの実装（モバイル・PC対応）
     status: pending
@@ -60,8 +45,8 @@ todos:
       - implement-fax-send
       - implement-fax-receive
       - implement-history
-  - id: setup-testing
-    content: テスト環境のセットアップと主要機能のテスト実装
+  - id: unit-testing
+    content: 単体テストの実装（主要機能のみ）
     status: pending
     dependencies:
       - implement-ui
@@ -89,58 +74,55 @@ todos:
 
 ## 2. システムアーキテクチャ
 
-### 2.1 技術スタック
+### 2.1 技術スタック（Firebase中心の軽量構成）
 
 - **フロントエンド**: Next.js 14+ (App Router), React, TypeScript
 - **UIフレームワーク**: Tailwind CSS, shadcn/ui
-- **バックエンド**: Next.js API Routes / Server Actions
-- **データベース**: PostgreSQL（推奨）または MySQL
-- **認証**: NextAuth.js
+- **バックエンド**: Next.js API Routes + Firebase Admin SDK
+- **データベース**: Cloud Firestore（NoSQL、リアルタイム同期対応）
+- **認証**: Firebase Authentication（メール/パスワード認証）
+- **ファイルストレージ**: Cloud Storage for Firebase
 - **FAXサービス**: 外部FAX API（Twilio Fax API または類似サービス）
-- **ファイルストレージ**: AWS S3 / Azure Blob Storage / ローカルストレージ
-- **リアルタイム通信**: WebSocket（Socket.io）または Server-Sent Events
+- **ホスティング**: Vercel（フロントエンド） + Firebase Functions（オプション）
 
-### 2.2 システム構成図
+### 2.2 システム構成図（Firebase中心）
 
 ```mermaid
 graph TB
     subgraph client [クライアント層]
         Web[Webブラウザ]
-        Mobile[モバイルアプリ]
+        Mobile[モバイルブラウザ]
     end
     
-    subgraph frontend [フロントエンド]
+    subgraph frontend [フロントエンド - Vercel]
         NextJS[Next.js App]
         UI[UI Components]
     end
     
     subgraph backend [バックエンド]
-        API[API Routes]
-        ServerActions[Server Actions]
-        Auth[認証モジュール]
+        API[Next.js API Routes]
+        FirebaseSDK[Firebase Admin SDK]
     end
     
-    subgraph services [外部サービス]
+    subgraph firebase [Firebase]
+        Auth[Firebase Auth]
+        Firestore[(Cloud Firestore)]
+        Storage[Cloud Storage]
+    end
+    
+    subgraph external [外部サービス]
         FaxAPI[FAX API]
-        Storage[ファイルストレージ]
-    end
-    
-    subgraph data [データ層]
-        DB[(PostgreSQL)]
-        Cache[(Redis Cache)]
     end
     
     Web --> NextJS
     Mobile --> NextJS
     NextJS --> UI
     NextJS --> API
-    NextJS --> ServerActions
-    API --> Auth
+    API --> FirebaseSDK
+    FirebaseSDK --> Auth
+    FirebaseSDK --> Firestore
+    FirebaseSDK --> Storage
     API --> FaxAPI
-    API --> Storage
-    ServerActions --> DB
-    API --> DB
-    API --> Cache
 ```
 
 
@@ -149,81 +131,48 @@ graph TB
 
 ### 3.1 認証・認可機能
 
-- ユーザー登録・ログイン
-- パスワードリセット
-- セッション管理
-- ロールベースアクセス制御（管理者、一般ユーザー）
-- 多要素認証（オプション）
+- Firebase Authenticationによるユーザー登録・ログイン
+- パスワードリセット（Firebase提供機能）
+- セッション管理（Firebase提供機能）
+- 基本的なロールベースアクセス制御（Firestoreカスタムクレーム）
 
 ### 3.2 FAX送信機能
 
 - **基本送信**
-- ファイルアップロード（PDF, 画像形式）
-- 宛先FAX番号入力
-- 送信者情報設定
-- 送信スケジュール設定
-- 送信確認・プレビュー
-- **一括送信**
-- CSV/Excelからの宛先一括インポート
-- テンプレートと宛先の組み合わせ送信
-- 送信進捗表示
+  - ファイルアップロード（PDF, 画像形式）
+  - 宛先FAX番号入力
+  - 送信者情報設定
+  - 送信確認・プレビュー
 - **送信オプション**
-- 送信優先度設定
-- 送信結果通知（メール/SMS）
-- 再送機能
+  - 送信結果通知（メール）
+  - 再送機能
 
 ### 3.3 FAX受信機能
 
-- 自動受信・保存
+- 自動受信・Cloud Storage保存
 - 受信FAX一覧表示
 - 受信FAXのプレビュー
 - 受信FAXのダウンロード
-- 受信通知（メール/プッシュ通知）
-- OCR機能（テキスト抽出、オプション）
+- 受信通知（メール）
 
 ### 3.4 送受信履歴管理
 
-- 送信履歴一覧（日付、宛先、ステータス、件名）
+- 送信履歴一覧（日付、宛先、ステータス）
 - 受信履歴一覧
-- 検索・フィルタ機能（日付範囲、宛先、キーワード）
-- 履歴のエクスポート（CSV/Excel）
+- 基本的な検索・フィルタ機能（日付範囲、宛先）
 - 詳細情報表示（送信時刻、完了時刻、エラー情報）
 
 ### 3.5 アドレス帳管理
 
 - 連絡先の登録・編集・削除
 - グループ管理（顧客グループ、取引先グループなど）
-- CSV/Excelからの一括インポート
-- 検索機能
-- カスタムフィールド（会社名、部署、役職など）
+- 基本的な検索機能
+- カスタムフィールド（会社名、部署）
 
-### 3.6 テンプレート機能
+### 3.6 ファイル管理機能
 
-- テンプレート作成・編集・削除
-- テンプレートカテゴリ管理
-- 変数挿入機能（日付、会社名、物件名など）
-- テンプレートプレビュー
-- テンプレート共有（組織内）
-
-### 3.7 物件情報連携機能
-
-- 物件情報の表示・検索
-- FAX送信時に物件情報を自動挿入
-- 物件に関連するFAX履歴の表示
-- 物件情報から直接FAX送信
-
-### 3.8 顧客管理連携機能
-
-- 顧客情報の表示・検索
-- 顧客に関連するFAX履歴の表示
-- 顧客情報から直接FAX送信
-- 顧客グループへの一括送信
-
-### 3.9 ファイル管理機能
-
-- 送信ファイルのアップロード・保存
+- 送信ファイルのアップロード・保存（Cloud Storage）
 - 受信FAXの保存・整理
-- フォルダ分類
 - ファイル検索
 - ファイル削除（論理削除）
 
@@ -262,69 +211,96 @@ graph TB
 - クラウドインフラ対応
 - 負荷分散対応
 
-## 5. データモデル
+## 5. データモデル（Firestore）
 
-### 5.1 主要エンティティ
+### 5.1 主要コレクション
 
 ```mermaid
 erDiagram
-    User ||--o{ FaxHistory : creates
-    User ||--o{ AddressBook : manages
-    User ||--o{ Template : creates
-    FaxHistory ||--o{ FaxFile : contains
-    AddressBook ||--o{ FaxHistory : "sends to"
-    Property ||--o{ FaxHistory : "related to"
-    Client ||--o{ FaxHistory : "related to"
-    Template ||--o{ FaxHistory : uses
+    users ||--o{ faxHistory : creates
+    users ||--o{ addressBook : manages
+    faxHistory ||--o{ faxFiles : contains
+    addressBook ||--o{ faxHistory : "sends to"
     
-    User {
-        int id PK
+    users {
+        string uid PK
         string email
         string name
         string role
-        datetime createdAt
+        timestamp createdAt
     }
     
-    FaxHistory {
-        int id PK
-        int userId FK
+    faxHistory {
+        string id PK
+        string userId FK
         string type "send/receive"
         string faxNumber
         string status
-        datetime sentAt
-        datetime receivedAt
+        timestamp sentAt
+        timestamp receivedAt
     }
     
-    AddressBook {
-        int id PK
-        int userId FK
+    addressBook {
+        string id PK
+        string userId FK
         string name
         string faxNumber
         string company
         string group
     }
     
-    Template {
-        int id PK
-        int userId FK
-        string name
-        string category
-        text content
+    faxFiles {
+        string id PK
+        string userId FK
+        string historyId FK
+        string storagePath
+        string fileName
+        string mimeType
+        number size
+        timestamp uploadedAt
     }
-    
-    Property {
-        int id PK
-        string propertyCode
-        string address
-        string type
-    }
-    
-    Client {
-        int id PK
-        string name
-        string company
-        string contactInfo
-    }
+```
+
+### 5.2 Firestoreコレクション構造
+
+```
+/users/{userId}
+  - email: string
+  - name: string
+  - role: string
+  - createdAt: timestamp
+
+/faxHistory/{historyId}
+  - userId: string
+  - type: string (send | receive)
+  - faxNumber: string
+  - toName: string (optional)
+  - fromName: string (optional)
+  - status: string (pending | sent | failed | received)
+  - fileId: string
+  - sentAt: timestamp
+  - receivedAt: timestamp
+  - errorMessage: string (optional)
+  - createdAt: timestamp
+
+/addressBook/{contactId}
+  - userId: string
+  - name: string
+  - faxNumber: string
+  - company: string
+  - group: string
+  - notes: string
+  - createdAt: timestamp
+  - updatedAt: timestamp
+
+/faxFiles/{fileId}
+  - userId: string
+  - historyId: string
+  - storagePath: string (Cloud Storage path)
+  - fileName: string
+  - mimeType: string
+  - size: number
+  - uploadedAt: timestamp
 ```
 
 
@@ -333,20 +309,20 @@ erDiagram
 
 ### 6.1 主要エンドポイント
 
-#### 認証
+#### 認証（Firebase Authentication）
 
-- `POST /api/auth/login` - ログイン
+- `POST /api/auth/register` - ユーザー登録（Firebase経由）
+- `POST /api/auth/login` - ログイン（Firebase経由）
 - `POST /api/auth/logout` - ログアウト
-- `POST /api/auth/register` - ユーザー登録
 
 #### FAX送信
 
 - `POST /api/fax/send` - FAX送信
-- `POST /api/fax/send-batch` - 一括送信
 - `GET /api/fax/status/:id` - 送信ステータス確認
 
 #### FAX受信
 
+- `POST /api/fax/webhook` - FAX受信Webhook
 - `GET /api/fax/received` - 受信FAX一覧
 - `GET /api/fax/received/:id` - 受信FAX詳細
 - `GET /api/fax/received/:id/download` - 受信FAXダウンロード
@@ -363,117 +339,124 @@ erDiagram
 - `PUT /api/address-book/:id` - 連絡先更新
 - `DELETE /api/address-book/:id` - 連絡先削除
 
-#### テンプレート
+#### ファイル管理
 
-- `GET /api/templates` - テンプレート一覧
-- `POST /api/templates` - テンプレート作成
-- `PUT /api/templates/:id` - テンプレート更新
-- `DELETE /api/templates/:id` - テンプレート削除
-
-#### 物件情報
-
-- `GET /api/properties` - 物件一覧
-- `GET /api/properties/:id` - 物件詳細
-- `GET /api/properties/:id/fax-history` - 物件関連FAX履歴
-
-#### 顧客管理
-
-- `GET /api/clients` - 顧客一覧
-- `GET /api/clients/:id` - 顧客詳細
-- `GET /api/clients/:id/fax-history` - 顧客関連FAX履歴
+- `POST /api/files/upload` - ファイルアップロード
+- `GET /api/files/:id` - ファイル取得
+- `DELETE /api/files/:id` - ファイル削除
 
 ## 7. UI/UX設計
 
-### 7.1 主要画面構成
+### 7.1 主要画面構成（簡素化）
 
 1. **ダッシュボード**
-
-- 送受信統計
-- 最近のFAX履歴
-- クイックアクション
+   - 送受信統計
+   - 最近のFAX履歴
+   - クイックアクション
 
 2. **FAX送信画面**
-
-- ファイルアップロードエリア
-- 宛先選択（アドレス帳/手入力）
-- 送信オプション設定
-- プレビュー表示
+   - ファイルアップロードエリア
+   - 宛先選択（アドレス帳/手入力）
+   - プレビュー表示
 
 3. **FAX受信画面**
-
-- 受信FAX一覧（グリッド/リスト表示）
-- フィルタ・検索機能
-- プレビュー・ダウンロード
+   - 受信FAX一覧（リスト表示）
+   - 基本的なフィルタ機能
+   - プレビュー・ダウンロード
 
 4. **履歴画面**
-
-- 送受信履歴一覧
-- 詳細検索
-- エクスポート機能
+   - 送受信履歴一覧
+   - 基本的な検索機能
 
 5. **アドレス帳画面**
+   - 連絡先一覧
+   - グループ管理
 
-- 連絡先一覧
-- グループ管理
-- 一括インポート
-
-6. **テンプレート画面**
-
-- テンプレート一覧
-- エディタ
-- カテゴリ管理
-
-7. **設定画面**
-
-- プロフィール設定
-- 通知設定
-- セキュリティ設定
+6. **設定画面**
+   - プロフィール設定
+   - 通知設定
 
 ### 7.2 レスポンシブデザイン
 
 - モバイル: 1カラムレイアウト、タッチ操作最適化
 - タブレット: 2カラムレイアウト
-- PC: 3カラムレイアウト、マルチウィンドウ対応
+- PC: 2-3カラムレイアウト
 
-## 8. 開発フェーズ
+## 8. 開発フェーズ（小規模インクリメンタル）
 
-### Phase 1: 基盤構築（MVP）
+### Phase 1: 基盤構築（1-2週間）
 
-- プロジェクトセットアップ
-- 認証機能
-- 基本的なFAX送受信機能
-- 履歴管理
+- Next.jsプロジェクトセットアップ
+- Firebase初期化（Auth、Firestore、Storage）
+- 基本的な認証機能（ログイン・登録）
 
-### Phase 2: コア機能拡張
+### Phase 2: コア機能実装（2-3週間）
 
+- ファイルアップロード機能（Cloud Storage）
+- FAX送信機能（外部API連携）
+- FAX受信機能（Webhook、自動保存）
+- 基本的なUI実装
+
+### Phase 3: 管理機能（1-2週間）
+
+- 送受信履歴管理
 - アドレス帳機能
-- テンプレート機能
-- 一括送信機能
+- 基本的な検索・フィルタ
 
-### Phase 3: 不動産業界特化機能
-
-- 物件情報連携
-- 顧客管理連携
-- カスタムテンプレート
-
-### Phase 4: 最適化・拡張
+### Phase 4: 改善・安定化（1週間）
 
 - パフォーマンス最適化
-- 追加機能（OCR、電子署名など）
-- 高度な分析機能
+- エラーハンドリング強化
+- 単体テストの追加（主要機能のみ）
+- ユーザビリティ改善
 
 ## 9. セキュリティ考慮事項
 
+- Firebase Security Rulesによるデータアクセス制御
 - 入力値検証・サニタイゼーション
-- SQLインジェクション対策
-- XSS対策
-- CSRF対策
-- レート制限
-- ファイルアップロード検証
-- ログ監視・アラート
+- HTTPS通信（Firebase、Vercel標準）
+- ファイルアップロード検証（サイズ、形式）
+- レート制限（Firebase App Check）
 
-## 10. テスト戦略
+## 10. テスト戦略（軽量化）
 
-- 単体テスト（Jest, Vitest）
-- 統合テスト
-- E2Eテスト（Playwright, Cypress）
+- 単体テスト（Jest）- 主要なビジネスロジックのみ
+- 統合テスト - API エンドポイントの主要フロー
+- 手動テスト - UI/UXの基本動作確認
+- **注**: E2Eテストは初期段階では実装せず、手動テストで代替
+
+## 11. Firebase利用のメリット
+
+### 11.1 開発速度の向上
+- 認証機能が組み込み済み（メール/パスワード、SNS連携も容易）
+- データベース設計が柔軟（NoSQL）
+- ファイルストレージが統合済み
+- リアルタイム同期が標準機能
+
+### 11.2 運用コストの削減
+- インフラ管理不要（フルマネージド）
+- 自動スケーリング
+- 無料枠が充実
+- 従量課金で初期コスト低減
+
+### 11.3 安定性とセキュリティ
+- Googleのインフラ基盤
+- 自動バックアップ
+- セキュリティルールによる細かいアクセス制御
+- DDoS対策が標準装備
+
+## 12. 実装における注意点
+
+### 12.1 Firebase制約への対応
+- Firestoreの書き込み制限（1秒に1回/ドキュメント）に注意
+- 複雑なクエリは制限されるため、データモデル設計を工夫
+- Cloud Storageのファイルサイズ制限（最大5TB）
+
+### 12.2 コスト管理
+- Firestore読み書き回数の最適化
+- Cloud Storage転送量の監視
+- Firebase使用量ダッシュボードで定期確認
+
+### 12.3 移行性の確保
+- ビジネスロジックはNext.js側に集約
+- Firebase依存部分を抽象化（将来的な移行に備える）
